@@ -1,7 +1,17 @@
 #![no_std]
 
 #[allow(unused_imports)]
-use gstd::prelude::*;
+use gstd::{debug, exec, msg, prelude::*};
+use tamagotchi_nft_io::{Tamagotchi,TmgEvent, TmgAction};
+
+const HUNGER_PER_BLOCK: u64 = 1;
+const BOREDOM_PER_BLOCK: u64 = 2;
+const ENERGY_PER_BLOCK: u64 = 2;
+const FILL_PER_FEED: u64 = 1000;
+const FILL_PER_ENTERTAINMENT: u64 = 1000;
+const FILL_PER_SLEEP: u64 = 1000;
+
+static mut TAMAGOTCHI: Option<Tamagotchi> = None;
 
 #[no_mangle]
 extern fn init() {
@@ -18,6 +28,7 @@ extern fn init() {
         entertained_block: exec::block_height().into(),
         slept: 1000,
         slept_block: exec::block_height().into(),
+        approved_account: None,
     };
     debug!(
         "The Tamagotchi Program was initialized with name {:?}, birth date {:?}, owner: {:?}",
@@ -95,6 +106,31 @@ extern fn handle() {
             msg::reply(TmgEvent::Slept(new_slept), 0).expect("Error in sending slept");
         
         }
+        TmgAction::Transfer(new_owner) => {
+            if _tamagotchi.owner == msg::source() {
+                _tamagotchi.owner = new_owner;
+                msg::reply(TmgEvent::Transfer(new_owner), 0).expect("Error in sending transfer");
+                // debug!("Tamagotchi Transfered to account: {:?}", new_owner)
+            }else{
+                panic!("You are not the owner of this Tamagotchi");}
+         
+        }
+        TmgAction::Approve(account) => {
+            if _tamagotchi.owner == msg::source() {
+            _tamagotchi.approved_account = Some(account);
+            msg::reply(TmgEvent::Approve(account), 0).expect("Error in sending approve");
+            // debug!("Approved account: {:?}", account)
+            }else{
+                panic!("You are not the allowed to approve accounts for this Tamagotchi");}
+        }
+        TmgAction::RevokeApproval => {
+            if _tamagotchi.owner == msg::source() {
+            _tamagotchi.approved_account = None;
+            msg::reply(TmgEvent::RevokeApproval, 0).expect("Error in sending revoke approval");
+            // debug!("Approved account: {:?} has been revoked", _tamagotchi.approved_account)
+            }else{
+                panic!("You are not the allowed to revoke approval for this Tamagotchi");}
+            }
     };
 }
 
