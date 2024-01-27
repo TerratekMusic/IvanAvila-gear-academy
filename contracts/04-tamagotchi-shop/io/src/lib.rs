@@ -19,6 +19,9 @@ pub struct Tamagotchi {
     pub slept_block: u64,
     pub approved_account: Option<ActorId>,
     // TODO: 2️⃣ Add new fields
+    pub ft_contract_id: ActorId,
+    pub transaction_id: u64,
+    pub approve_transaction: Option<(TransactionId, ActorId, u128)>,
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -34,6 +37,15 @@ pub enum TmgAction {
     Approve(ActorId),
     RevokeApproval,
     // TODO: 3️⃣ Add new actions
+    SetFTokenContract(ActorId),
+    ApproveTokens {
+        account: ActorId,
+        amount: u128,
+    },
+    BuyAttribute {
+        store_id: ActorId,
+        attribute_id: AttributeId,
+    },
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -49,6 +61,12 @@ pub enum TmgEvent {
     Approve(ActorId),
     RevokeApproval,
     // TODO: 4️⃣ Add new events
+    FTokenContractSet,
+    TokensApproved { account: ActorId, amount: u128 },
+    ApprovalError,
+    AttributeBought(AttributeId),
+    CompletePrevPurchase(AttributeId),
+    ErrorDuringPurchase,
 }
 
 pub struct ProgramMetadata;
