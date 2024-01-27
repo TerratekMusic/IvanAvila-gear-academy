@@ -2,8 +2,40 @@
 
 #[allow(unused_imports)]
 use gstd::prelude::*;
+use ft_main_io::{FTokenAction, FTokenEvent, LogicAction};
+use tamagotchi_nft_io::{Tamagotchi,TmgEvent, TmgAction};
+
+const HUNGER_PER_BLOCK: u64 = 1;
+const BOREDOM_PER_BLOCK: u64 = 2;
+const ENERGY_PER_BLOCK: u64 = 2;
+const FILL_PER_FEED: u64 = 1000;
+const FILL_PER_ENTERTAINMENT: u64 = 1000;
+const FILL_PER_SLEEP: u64 = 1000;
+
+static mut TAMAGOTCHI: Option<Tamagotchi> = None;
 
 // TODO: 5️⃣ Add the `approve_tokens` function
+async fn approve_tokens(&mut self, account: &ActorId, amount: u128) {
+    // ...
+    msg::send_for_reply_as::<_, FTokenEvent>(
+        self.ft_contract_id,
+        FTokenAction::Message {
+            transaction_id: self.transaction_id,
+            payload: LogicAction::Approve {
+                approved_account: account,
+                amount,
+            },
+        },
+        0,
+        0,
+    )
+    .expect("Error in sending a message `FTokenAction::Message`")
+    .await;
+    // ...
+}
+
+
+
 
 #[no_mangle]
 extern fn init() {
