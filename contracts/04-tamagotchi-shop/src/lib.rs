@@ -1,9 +1,13 @@
 #![no_std]
 
 #[allow(unused_imports)]
-use gstd::prelude::*;
-use ft_main_io::{FTokenAction, FTokenEvent, LogicAction};
-use tamagotchi_nft_io::{Tamagotchi,TmgEvent, TmgAction};
+use gstd::{debug, exec, msg, prelude::*};
+use sharded_fungible_token_io::FTokenAction;
+use sharded_fungible_token_io::FTokenEvent;
+use sharded_fungible_token_io::LogicAction;
+
+use tamagotchi_shop_io::{Tamagotchi, TmgEvent, TmgAction};
+
 
 const HUNGER_PER_BLOCK: u64 = 1;
 const BOREDOM_PER_BLOCK: u64 = 2;
@@ -52,6 +56,10 @@ extern fn init() {
         entertained_block: exec::block_height().into(),
         slept: 1000,
         slept_block: exec::block_height().into(),
+        approved_account: None,
+        ft_contract_id: ActorId::from(0),
+        transaction_id: 0,
+        approve_transaction: None,
     };
     debug!(
         "The Tamagotchi Program was initialized with name {:?}, birth date {:?}, owner: {:?}",
@@ -127,6 +135,38 @@ extern fn handle() {
             _tamagotchi.slept_block = new_slept_block;
             msg::reply(TmgEvent::Slept(new_slept), 0).expect("Error in sending slept");
         
+        }
+        TmgAction::Transfer(new_owner) => {
+            if _tamagotchi.owner == msg::source() {
+                _tamagotchi.owner = new_owner;
+                msg::reply(TmgEvent::Transfer(new_owner), 0).expect("Error in sending transfer");
+                // debug!("Tamagotchi Transfered to account: {:?}", new_owner)
+            }else{
+                panic!("You are not the owner of this Tamagotchi");}
+         
+        }
+        TmgAction::Approve(account) => {
+            if _tamagotchi.owner == msg::source() {
+            _tamagotchi.approved_account = Some(account);
+            msg::reply(TmgEvent::Approve(account), 0).expect("Error in sending approve");
+            // debug!("Approved account: {:?}", account)
+            }else{
+                panic!("You are not the allowed to approve accounts for this Tamagotchi");}
+        }
+        TmgAction::RevokeApproval => {
+            if _tamagotchi.owner == msg::source() {
+            _tamagotchi.approved_account = None;
+            msg::reply(TmgEvent::RevokeApproval, 0).expect("Error in sending revoke approval");
+            // debug!("Approved account: {:?} has been revoked", _tamagotchi.approved_account)
+            }else{
+                panic!("You are not the allowed to revoke approval for this Tamagotchi");}
+            }
+        TmgAction::SetFTokenContract(ft_contract_id) => {
+
+        }
+        TmgAction::ApproveTokens { account, amount } => {
+        }
+        TmgAction::BuyAttribute { store_id, attribute_id } => {
         }
     };
 

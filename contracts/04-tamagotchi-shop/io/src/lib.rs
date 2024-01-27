@@ -1,12 +1,17 @@
 #![no_std]
-
-use gstd::prelude::*;
+use gstd::{prelude::*, ActorId};
 use scale_info::TypeInfo;
 use gmeta::{In, InOut, Metadata, Out};
+
+use store_io::{
+    AttrMetadata, AttributeId, Price, StoreAction, StoreEvent, TamagotchiId, TransactionId,
+};
+
 
 #[derive(Default, Encode, Decode, TypeInfo)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
+
 pub struct Tamagotchi {
     pub name: String,
     pub date_of_birth: u64,
