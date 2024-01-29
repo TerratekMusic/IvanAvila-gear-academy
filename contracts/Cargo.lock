@@ -5678,6 +5678,7 @@ version = "0.3.3"
 dependencies = [
  "gear-wasm-builder",
  "gstd",
+ "gtest",
  "tamagotchi-auto-io",
 ]
 

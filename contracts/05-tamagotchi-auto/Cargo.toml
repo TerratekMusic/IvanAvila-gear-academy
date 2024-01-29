@@ -11,3 +11,6 @@ tamagotchi-auto-io.workspace = true
 [build-dependencies]
 gear-wasm-builder.workspace = true
 tamagotchi-auto-io.workspace = true
+
+[dev-dependencies]
+gtest.workspace = true
