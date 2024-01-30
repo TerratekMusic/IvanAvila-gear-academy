@@ -1,12 +1,17 @@
 #![no_std]
-
 use gstd::{prelude::*, ActorId};
 use scale_info::TypeInfo;
 use gmeta::{In, InOut, Metadata, Out};
 
+use store_io::{
+ AttributeId, TransactionId,
+};
+
+
 #[derive(Default, Encode, Decode, TypeInfo)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
+
 pub struct Tamagotchi {
     pub name: String,
     pub date_of_birth: u64,
@@ -17,8 +22,11 @@ pub struct Tamagotchi {
     pub entertained_block: u64,
     pub slept: u64,
     pub slept_block: u64,
-    // TODO: 1️⃣ Add new fields
     pub approved_account: Option<ActorId>,
+    pub ft_contract_id:Option<ActorId>,
+    pub transaction_id: u64,
+    pub approve_transaction: Option<(TransactionId, ActorId, u128)>,
+    // TODO: 1️⃣ Add new fields
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -30,10 +38,20 @@ pub enum TmgAction {
     Feed,
     Entertain,
     Sleep,
-    // TODO: 2️⃣ Add new actions
     Transfer(ActorId),
     Approve(ActorId),
     RevokeApproval,
+    // TODO: 3️⃣ Add new actions
+    SetFTokenContract(ActorId),
+    ApproveTokens {
+        account: ActorId,
+        amount: u128,
+    },
+    BuyAttribute {
+        store_id: ActorId,
+        attribute_id: AttributeId,
+    },
+    // TODO: 2️⃣ Add new actions
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -45,10 +63,16 @@ pub enum TmgEvent {
     Fed(u64),
     Entertained(u64),
     Slept(u64),
-    // TODO: 3️⃣ Add new events
     Transfer(ActorId),
     Approve(ActorId),
     RevokeApproval,
+    FTokenContractSet,
+    TokensApproved { account: ActorId, amount: u128 },
+    ApprovalError,
+    AttributeBought(AttributeId),
+    CompletePrevPurchase(AttributeId),
+    ErrorDuringPurchase,
+       // TODO: 3️⃣ Add new events
 }
 
 pub struct ProgramMetadata;
@@ -62,4 +86,3 @@ impl Metadata for ProgramMetadata {
     type Others = ();
     type Signal = ();
 }
-
