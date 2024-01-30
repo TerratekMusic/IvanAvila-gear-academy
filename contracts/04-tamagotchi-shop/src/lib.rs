@@ -1,11 +1,11 @@
 #![no_std]
 
 #[allow(unused_imports)]
-use gstd::{debug, exec, msg, prelude::*};
+use gstd::{async_main, fmt, debug, exec, msg, prelude::*, ActorId};
 use sharded_fungible_token_io::FTokenAction;
 use sharded_fungible_token_io::FTokenEvent;
 use sharded_fungible_token_io::LogicAction;
-
+use store_io::{StoreAction, StoreEvent};
 use tamagotchi_shop_io::{Tamagotchi, TmgEvent, TmgAction};
 
 
@@ -19,14 +19,14 @@ const FILL_PER_SLEEP: u64 = 1000;
 static mut TAMAGOTCHI: Option<Tamagotchi> = None;
 
 // TODO: 5️⃣ Add the `approve_tokens` function
-async fn approve_tokens(&mut self, account: &ActorId, amount: u128) {
+async fn approve_tokens(tamagotchi: &mut Tamagotchi, account: &ActorId, amount: u128) {
     // ...
-    msg::send_for_reply_as::<_, FTokenEvent>(
-        self.ft_contract_id,
+    let _approve_FT = msg::send_for_reply_as::<_, FTokenEvent>(
+        unsafe { tamagotchi.ft_contract_id },
         FTokenAction::Message {
-            transaction_id: self.transaction_id,
+            transaction_id: tamagotchi.transaction_id,
             payload: LogicAction::Approve {
-                approved_account: account,
+                approved_account: account.clone(),
                 amount,
             },
         },
@@ -38,16 +38,28 @@ async fn approve_tokens(&mut self, account: &ActorId, amount: u128) {
     // ...
 }
 
+async fn buy_attribute(store: &ActorId, attribute: u32) {
+    let _result_buy = msg::send_for_reply_as::<_, StoreEvent>(
+        store.clone(),
+        StoreAction::BuyAttribute {
+            attribute_id: attribute,
+        },
+        0,
+        0,
+    )
+    .expect("Error in sending a message `StoreAction::BuyAttribute`")
+    .await;
+}
+
 
 
 
 #[no_mangle]
 extern fn init() {
     // TODO: 0️⃣ Copy the `init` function from the previous lesson and push changes to the master branch
-    let init_msg: String = msg::load().expect("Can't decode an init message");
 
     let tamagotchi = Tamagotchi {
-        name: "Ivan".to_string(),
+        name:  msg::load().expect("Can't decode an init message"),
         date_of_birth: exec::block_timestamp(),
         owner: msg::source(),
         fed: 1000,
@@ -57,8 +69,8 @@ extern fn init() {
         slept: 1000,
         slept_block: exec::block_height().into(),
         approved_account: None,
-        ft_contract_id: ActorId::from(0),
-        transaction_id: 0,
+        ft_contract_id: Default::default(),
+        transaction_id: Default::default(),
         approve_transaction: None,
     };
     debug!(
@@ -68,8 +80,9 @@ extern fn init() {
     unsafe { TAMAGOTCHI = Some(tamagotchi) };
 }
 
-#[no_mangle]
-extern fn handle() {
+
+#[async_main]
+async fn main() {
      // TODO: 0️⃣ Copy the `handle` function from the previous lesson and push changes to the master branch
      let _tamagotchi = unsafe {
         TAMAGOTCHI
@@ -79,12 +92,12 @@ extern fn handle() {
     
     let name = &_tamagotchi.name;
     let current_time = exec::block_timestamp();
-    let age = current_time - _tamagotchi.date_of_birth;
+    let age = current_time.saturating_sub(_tamagotchi.date_of_birth);
     let action: TmgAction = msg::load().expect("Can't decode an action message");
     
     // 
 
-    let _event = match action {
+  match action {
         TmgAction::Name => {
             msg::reply(TmgEvent::Name(name.to_string()), 0).expect("Error in sending name");
         }
@@ -161,16 +174,25 @@ extern fn handle() {
             }else{
                 panic!("You are not the allowed to revoke approval for this Tamagotchi");}
             }
-        TmgAction::SetFTokenContract(ft_contract_id) => {
-
+            // TODO; 6️⃣ Add handling new actions
+        TmgAction::SetFTokenContract(contract) => {
+            _tamagotchi.ft_contract_id = Some(contract);
+            msg::reply(TmgEvent::FTokenContractSet, 0)
+                .expect("Error in a reply `TmgEvent::FTokenContractSet`");
         }
         TmgAction::ApproveTokens { account, amount } => {
+            approve_tokens(_tamagotchi, &account, amount).await;
+            msg::reply(TmgEvent::TokensApproved { account, amount }, 0)
+                .expect("Error in a reply `TmgEvent::TokensApproved`");
         }
         TmgAction::BuyAttribute { store_id, attribute_id } => {
+            buy_attribute(&store_id, attribute_id).await;
+            msg::reply(TmgEvent::AttributeBought(attribute_id), 0)
+                .expect("Error in a reply `TmgEvent::AttributeBought`");
         }
     };
 
-    // TODO; 6️⃣ Add handling new actions
+    
 
 }
 
