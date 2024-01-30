@@ -22,7 +22,7 @@ static mut TAMAGOTCHI: Option<Tamagotchi> = None;
 async fn approve_tokens(tamagotchi: &mut Tamagotchi, account: &ActorId, amount: u128) {
     // ...
     let _approve_FT = msg::send_for_reply_as::<_, FTokenEvent>(
-        unsafe { tamagotchi.ft_contract_id },
+        tamagotchi.ft_contract_id.unwrap(),
         FTokenAction::Message {
             transaction_id: tamagotchi.transaction_id,
             payload: LogicAction::Approve {

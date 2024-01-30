@@ -4,7 +4,7 @@ use scale_info::TypeInfo;
 use gmeta::{In, InOut, Metadata, Out};
 
 use store_io::{
-    AttrMetadata, AttributeId, Price, StoreAction, StoreEvent, TamagotchiId, TransactionId,
+ AttributeId, TransactionId,
 };
 
 
@@ -24,7 +24,7 @@ pub struct Tamagotchi {
     pub slept_block: u64,
     pub approved_account: Option<ActorId>,
     // TODO: 2️⃣ Add new fields
-    pub ft_contract_id: ActorId,
+    pub ft_contract_id:Option<ActorId>,
     pub transaction_id: u64,
     pub approve_transaction: Option<(TransactionId, ActorId, u128)>,
 }
