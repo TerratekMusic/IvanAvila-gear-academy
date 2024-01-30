@@ -1,4 +1,4 @@
-use coursework-battle-io::ProgramMetadata;
+use battle-io::ProgramMetadata;
 
 fn main() {
     gear_wasm_builder::build_with_metadata::<ProgramMetadata>();

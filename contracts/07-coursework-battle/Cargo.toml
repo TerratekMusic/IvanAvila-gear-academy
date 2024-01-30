@@ -1,18 +1,19 @@
 [package]
-name = "tamagotchi-auto"
+name = "coursework-battle-io"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
 gstd.workspace = true
-tamagotchi-auto-io.workspace = true
+coursework-battle-io.workspace = true
 sharded-fungible-token-io.workspace = true
 store-io.workspace = true
 
+
 [build-dependencies]
 gear-wasm-builder.workspace = true
-tamagotchi-auto-io.workspace = true
+coursework-battle-io.workspace = true
 
 [dev-dependencies]
 gtest.workspace = true

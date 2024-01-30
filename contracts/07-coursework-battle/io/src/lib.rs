@@ -1,32 +1,26 @@
 #![no_std]
-use gstd::{prelude::*, ActorId};
-use scale_info::TypeInfo;
 use gmeta::{In, InOut, Metadata, Out};
-
-use store_io::{
- AttributeId, TransactionId,
-};
-
+use gstd::{prelude::*, ActorId, ReservationId};
+use store_io::{AttributeId, TransactionId};
 
 #[derive(Default, Encode, Decode, TypeInfo)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
-
 pub struct Tamagotchi {
     pub name: String,
     pub date_of_birth: u64,
     pub owner: ActorId,
-    pub fed: u64,
-    pub fed_block: u64,
-    pub entertained: u64,
-    pub entertained_block: u64,
-    pub slept: u64,
-    pub slept_block: u64,
+    pub fed: u32,
+    pub fed_block: u32,
+    pub entertained: u32,
+    pub entertained_block: u32,
+    pub slept: u32,
+    pub slept_block: u32,
     pub approved_account: Option<ActorId>,
-    pub ft_contract_id:Option<ActorId>,
+    pub ft_contract_id: Option<ActorId>,
     pub transaction_id: u64,
     pub approve_transaction: Option<(TransactionId, ActorId, u128)>,
-    // TODO: 1️⃣ Add new fields
+    pub reservations: Vec<ReservationId>,
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -41,7 +35,6 @@ pub enum TmgAction {
     Transfer(ActorId),
     Approve(ActorId),
     RevokeApproval,
-    // TODO: 3️⃣ Add new actions
     SetFTokenContract(ActorId),
     ApproveTokens {
         account: ActorId,
@@ -51,7 +44,12 @@ pub enum TmgAction {
         store_id: ActorId,
         attribute_id: AttributeId,
     },
-    // TODO: 2️⃣ Add new actions
+    CheckState,
+    ReserveGas {
+        reservation_amount: u64,
+        duration: u32,
+    },
+    TmgInfo,
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -60,24 +58,28 @@ pub enum TmgAction {
 pub enum TmgEvent {
     Name(String),
     Age(u64),
-    Fed(u64),
-    Entertained(u64),
-    Slept(u64),
-    Transfer(ActorId),
-    Approve(ActorId),
-    RevokeApproval,
+    Fed,
+    Entertained,
+    Slept,
+    Transferred(ActorId),
+    Approved(ActorId),
+    ApprovalRevoked,
     FTokenContractSet,
     TokensApproved { account: ActorId, amount: u128 },
     ApprovalError,
     AttributeBought(AttributeId),
     CompletePrevPurchase(AttributeId),
     ErrorDuringPurchase,
-       // TODO: 3️⃣ Add new events
+    FeedMe,
+    PlayWithMe,
+    WantToSleep,
+    MakeReservation,
+    GasReserved,
+    Owner(ActorId),
 }
 
 pub struct ProgramMetadata;
 
-// TODO: 0️⃣ Copy `Metadata` from the first lesson and push changes to the master branch
 impl Metadata for ProgramMetadata {
     type Init = In<String>;
     type Handle = InOut<TmgAction, TmgEvent>;
