@@ -8,3 +8,10 @@ edition = "2021"
 [dependencies]
 gstd.workspace = true
 gmeta.workspace = true
+store-io.workspace = true
+coursework-battle-io.workspace = true
+
+[build-dependencies]
+gear-wasm-builder.workspace = true
+store-io.workspace = true
+coursework-battle-io.workspace = true

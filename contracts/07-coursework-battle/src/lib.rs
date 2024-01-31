@@ -4,7 +4,7 @@
 use gstd::{async_main, debug, exec, fmt, msg, prelude::*, ActorId, ReservationId};
 use sharded_fungible_token_io::{FTokenAction, FTokenEvent, LogicAction};
 use store_io::{StoreAction, StoreEvent};
-use tamagotchi_auto_io::{Tamagotchi, TmgAction, TmgEvent};
+use coursework_battle_io::{Tamagotchi, TmgAction, TmgEvent};
 
 static mut TAMAGOTCHI: Option<Tamagotchi> = None;
 
@@ -185,6 +185,9 @@ async fn main() {
             tamagotchi.reservations.push(reservation_id);
             msg::reply(TmgEvent::GasReserved, 0)
                 .expect("Error in replying GasReserved event payload");
+        }
+        TmgAction::TmgInfo => {
+            msg::reply(TmgEvent::Owner(tamagotchi.owner), 0).expect("Error in sending reply");
         }
     }
 }

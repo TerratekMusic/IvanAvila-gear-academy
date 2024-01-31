@@ -9,6 +9,8 @@ edition = "2021"
 gstd.workspace = true
 store-io.workspace = true
 sharded-fungible-token-io.workspace = true
+battle-io.workspace = true
+
 
 [build-dependencies]
 gear-wasm-builder.workspace = true

@@ -416,11 +416,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
+name = "battle"
+version = "0.1.0"
+dependencies = [
+ "battle-io",
+ "gear-wasm-builder",
+ "gstd",
+ "sharded-fungible-token-io",
+ "store-io",
+]
+
+[[package]]
 name = "battle-io"
 version = "0.1.0"
 dependencies = [
+ "coursework-battle-io",
+ "gear-wasm-builder",
  "gmeta",
  "gstd",
+ "store-io",
 ]
 
 [[package]]
@@ -843,6 +857,27 @@ dependencies = [
  "libc",
  "scopeguard",
  "windows-sys 0.33.0",
+]
+
+[[package]]
+name = "coursework-battle"
+version = "0.3.3"
+dependencies = [
+ "coursework-battle-io",
+ "gear-wasm-builder",
+ "gstd",
+ "gtest",
+ "sharded-fungible-token-io",
+ "store-io",
+]
+
+[[package]]
+name = "coursework-battle-io"
+version = "0.3.3"
+dependencies = [
+ "gmeta",
+ "gstd",
+ "store-io",
 ]
 
 [[package]]
@@ -5482,6 +5517,16 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "store"
+version = "0.3.3"
+dependencies = [
+ "gear-wasm-builder",
+ "gstd",
+ "sharded-fungible-token-io",
+ "store-io",
+]
+
+[[package]]
+name = "store-battle"
 version = "0.3.3"
 dependencies = [
  "gear-wasm-builder",
