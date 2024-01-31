@@ -1,7 +1,7 @@
 
 #![no_std]
 use battle_io::{BattleAction, BattleEvent, BattleState};
-use gstd::{debug, exec, msg, prelude::*, ActorId, Panic, collections::{BTreeMap, BTreeSet}};
+use gstd::{debug, exec, msg, prelude::*, ActorId, panic, collections::{BTreeMap, BTreeSet}};
 use coursework_battle_io::{ TmgAction, TmgEvent};
 use store_io::{StoreAction, StoreEvent, AttributeId, TamagotchiId};
 
@@ -110,14 +110,14 @@ impl Battle {
             self.players = Vec::new();
             self.state = BattleState::GameIsOver;
             self.winner = player.tmg_id;
-            msg::reply(BattleEvent::GameIsOver, 0)
+            msg::reply(BattleEvent::GameOver(self.winner), 0)
                 .expect("Error in sending a reply `BattleEvent::GameIsOver`");
             return;
         }
         if self.steps <= MAX_STEPS_FOR_ROUND {
             self.steps += 1;
             self.current_turn = next_turn as u8;
-            msg::reply(BattleEvent::MoveMade, 0)
+            msg::reply(BattleEvent::Moved, 0)
                 .expect("Error in sending a reply `BattleEvent::MoveMade`");
         } else {
             self.state = BattleState::Waiting;
@@ -164,7 +164,7 @@ extern fn init() {
     let init_message: BattleAction = msg::load().expect("Can't decode regitration message");
     let battle = Battle{
         players: Vec::new(),
-        state: BattleState::Register,
+        state: BattleState::Registration,
         current_turn: 0,
         tmg_store_id: ActorId::default(),
         winner: ActorId::default(),
@@ -172,7 +172,7 @@ extern fn init() {
     };
 
   unsafe{
-    BATTLE = Some(Battle);
+    BATTLE = Some(battle);
   }
     
 }
@@ -183,17 +183,18 @@ async fn main() {
 
     let action: BattleAction = msg::load().expect("Unable to decode `BattleAction`");
     let battle: &mut Battle = unsafe { BATTLE.get_or_insert(Default::default()) };
+
     match action {
         BattleAction::UpdateInfo => battle.update_info().await,
-        BattleAction::MakeMove => battle.make_move(),
-        BattleAction::Register (TamagotchiId) => battle.register(&tmg_id).await,
+        BattleAction::Move => battle.make_move().await,
+        BattleAction::Register (TamagotchiId) => battle.register(&TamagotchiId).await,
     }
 
 }
 
 pub async fn get_owner(tmg_id: &ActorId) -> ActorId {
-    let reply: TmgEvent = msg::send_for_reply_as(*tmg_id, TmgAction::Owner, 0, 0)
-        .expect("Error in sending a message `TmgAction::Owner")
+    let reply: TmgEvent = msg::send_for_reply_as(*tmg_id, TmgAction::TmgInfo, 0, 0)
+        .expect("Error in sending a message `TmgAction::TmgInfo`")
         .await
         .expect("Unable to decode TmgEvent");
     if let TmgEvent::Owner(owner) = reply {

@@ -189,6 +189,7 @@ async fn main() {
         TmgAction::TmgInfo => {
             msg::reply(TmgEvent::Owner(tamagotchi.owner), 0).expect("Error in sending reply");
         }
+       
     }
 }
 

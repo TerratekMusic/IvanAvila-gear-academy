@@ -50,6 +50,7 @@ pub enum TmgAction {
         duration: u32,
     },
     TmgInfo,
+    
 }
 
 #[derive(Encode, Decode, TypeInfo)]

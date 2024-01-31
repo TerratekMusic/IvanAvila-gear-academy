@@ -7,7 +7,7 @@ use store_io::AttributeId;
 
 pub type TamagotchiId = ActorId;
 
-#[derive(Default, Encode, Decode, TypeInfo)]
+#[derive(Default, Encode, Decode, TypeInfo, Debug, PartialEq)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
 pub enum BattleState {
@@ -44,18 +44,20 @@ pub struct Player {
 
 
 
-#[derive(Encode, Decode, TypeInfo)]
+#[derive(Encode, Decode, TypeInfo, Debug)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
 pub enum BattleAction {
     Register(TamagotchiId),
     Move(TamagotchiId),
+    UpdateInfo,
+
     // Attack(TamagotchiId, u8),
     // Defend(TamagotchiId, u8),
     // Surrender(TamagotchiId),   
 }
 
-#[derive(Encode, Decode, TypeInfo)]
+#[derive(Encode, Decode, TypeInfo, Debug)]
 #[codec(crate = gstd::codec)]
 #[scale_info(crate = gstd::scale_info)]
 pub enum BattleEvent {
@@ -63,6 +65,7 @@ pub enum BattleEvent {
     Moved { tmg_id: TamagotchiId, steps: u8 },
     GameOver { winner: ActorId },
     GoToWaitingState,
+    InfoUpdated
     
 }
 
