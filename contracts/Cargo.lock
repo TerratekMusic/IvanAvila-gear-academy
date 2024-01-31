@@ -420,6 +420,7 @@ name = "battle"
 version = "0.1.0"
 dependencies = [
  "battle-io",
+ "coursework-battle-io",
  "gear-wasm-builder",
  "gstd",
  "sharded-fungible-token-io",

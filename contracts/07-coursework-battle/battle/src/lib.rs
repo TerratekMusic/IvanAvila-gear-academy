@@ -1,9 +1,10 @@
 
+#![no_std]
 use battle_io::{BattleAction, BattleEvent, BattleState};
-use gstd::{exec, msg, prelude::*, ActorId, collections::{BTreeMap, BTreeSet}};
-use coursework_battle_io::{ TamagotchiId, TmgAction, TmgEvent};
-use store_io::{StoreAction, StoreEvent, AttributeId};
-use crate::panic;
+use gstd::{debug, exec, msg, prelude::*, ActorId, Panic, collections::{BTreeMap, BTreeSet}};
+use coursework_battle_io::{ TmgAction, TmgEvent};
+use store_io::{StoreAction, StoreEvent, AttributeId, TamagotchiId};
+
 
 const MAX_POWER: u16 = 10_000;
 const MIN_POWER: u16 = 3_000;
@@ -11,11 +12,15 @@ const MIN_POWER: u16 = 3_000;
 const SWORD_POWER: u16 = 2;
 const SWORD_ID: AttributeId = Default::default();
 
+//CONST SHIELD_POWER: u16 = 2;
+//CONST SHIELD_ID: AttributeId = Default::default();
+
 const TIME_FOR_UPDATE: u32 = 500;
 const MAX_STEPS_FOR_ROUND: u8 = 3;
 const GAS_AMOUNT: u64 = 100_000_000;
 
 static mut BATTLE : Option<Battle> = None;
+static mut PLAYER : Option<Player> = None;
 
 #[derive(Default)]
 struct Battle {
@@ -156,22 +161,33 @@ impl Battle {
 
 #[no_mangle]
 extern fn init() {
-    let register_message: BattleAction = msg::load().expect("Can't decode regitration message");
+    let init_message: BattleAction = msg::load().expect("Can't decode regitration message");
     let battle = Battle{
         players: Vec::new(),
-        state: BattleState::Registration,
+        state: BattleState::Register,
         current_turn: 0,
-        tmg_store_id: register_message.tmg_store_id,
+        tmg_store_id: ActorId::default(),
         winner: ActorId::default(),
         steps: 0,
     };
+
+  unsafe{
+    BATTLE = Some(Battle);
+  }
+    
 }
 
 #[gstd::async_main]
 async fn main() {
 
 
-  //await for moves
+    let action: BattleAction = msg::load().expect("Unable to decode `BattleAction`");
+    let battle: &mut Battle = unsafe { BATTLE.get_or_insert(Default::default()) };
+    match action {
+        BattleAction::UpdateInfo => battle.update_info().await,
+        BattleAction::MakeMove => battle.make_move(),
+        BattleAction::Register (TamagotchiId) => battle.register(&tmg_id).await,
+    }
 
 }
 
@@ -209,7 +225,7 @@ async fn get_attributes(
     let reply: StoreEvent = msg::send_for_reply_as(
         *tmg_store_id,
         StoreAction::GetAttributes {
-            Tamagotchi_id: *tmg_id,
+            tamagotchi_id: *tmg_id,
         },
         0,
         0,

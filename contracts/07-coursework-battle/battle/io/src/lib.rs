@@ -52,8 +52,7 @@ pub enum BattleAction {
     Move(TamagotchiId),
     // Attack(TamagotchiId, u8),
     // Defend(TamagotchiId, u8),
-    // Surrender(TamagotchiId),
-    
+    // Surrender(TamagotchiId),   
 }
 
 #[derive(Encode, Decode, TypeInfo)]
@@ -63,6 +62,7 @@ pub enum BattleEvent {
     Registered { tmg_id: TamagotchiId },
     Moved { tmg_id: TamagotchiId, steps: u8 },
     GameOver { winner: ActorId },
+    GoToWaitingState,
     
 }
 
