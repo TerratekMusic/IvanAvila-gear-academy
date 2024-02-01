@@ -1,7 +1,7 @@
 
 #![no_std]
 use battle_io::{BattleAction, BattleEvent, BattleState};
-use gstd::{debug, exec, msg, prelude::*, ActorId, panic, collections::{BTreeMap, BTreeSet}};
+use gstd::{debug, exec, msg, prelude::*, ActorId, panic, collections::{BTreeMap, BTreeSet}, async_main };
 use coursework_battle_io::{ TmgAction, TmgEvent};
 use store_io::{StoreAction, StoreEvent, AttributeId, TamagotchiId};
 
@@ -80,15 +80,15 @@ impl Battle {
     }
 
     
-    fn make_move(&mut self) {
+    pub fn make_move(&mut self) {
         assert_eq!(
             self.state,
             BattleState::Moves,
             "The game is not in `Moves` state"
         );
         let turn = self.current_turn as usize;
-    
-        let next_turn = (( turn + 1 ) % 2)as usize;
+
+        let next_turn = ((turn + 1) % 2) as usize;
         let player = self.players[turn].clone();
         assert_eq!(
             player.owner,
@@ -96,21 +96,22 @@ impl Battle {
             "You are not in the game or it is not your turn"
         );
         let mut opponent = self.players[next_turn].clone();
-        let sword_power = if player.attributes.contains(&SWORD_ID) {
-            SWORD_POWER
-        } else {
-            1
-        };
-    
+        // let sword_power = if player.attributes.contains(&SWORD_ID) {
+        //     SWORD_POWER
+        // } else {
+        //     1
+        // };
+        let sword_power = SWORD_POWER;
+
         opponent.energy = opponent.energy.saturating_sub(sword_power * player.power);
-    
+
         self.players[next_turn] = opponent.clone();
         // Check if the opponent lost
         if opponent.energy == 0 {
             self.players = Vec::new();
             self.state = BattleState::GameIsOver;
             self.winner = player.tmg_id;
-            msg::reply(BattleEvent::GameOver(self.winner), 0)
+            msg::reply(BattleEvent::GameOver, 0)
                 .expect("Error in sending a reply `BattleEvent::GameIsOver`");
             return;
         }
@@ -184,11 +185,11 @@ async fn main() {
     let action: BattleAction = msg::load().expect("Unable to decode `BattleAction`");
     let battle: &mut Battle = unsafe { BATTLE.get_or_insert(Default::default()) };
 
-    match action {
-        BattleAction::UpdateInfo => battle.update_info().await,
-        BattleAction::Move => battle.make_move().await,
-        BattleAction::Register (TamagotchiId) => battle.register(&TamagotchiId).await,
-    }
+    // match action {
+    //     BattleAction::UpdateInfo => battle.update_info().await,
+    //     BattleAction::Move => battle.make_move().await,
+    //     BattleAction::Register (TamagotchiId) => battle.register(&TamagotchiId).await,
+    // }
 
 }
 
