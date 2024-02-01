@@ -422,6 +422,7 @@ dependencies = [
  "battle-io",
  "coursework-battle-io",
  "gear-wasm-builder",
+ "gmeta",
  "gstd",
  "sharded-fungible-token-io",
  "store-io",
