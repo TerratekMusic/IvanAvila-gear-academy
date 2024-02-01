@@ -109,9 +109,9 @@ async fn main() {
             let fed: u64 = _tamagotchi.fed;
             let fed_block: u64 = _tamagotchi.fed_block;
             let current_block: u64 = exec::block_height().into();
-            let time_passed: u64 = current_block - fed_block;
+            let time_passed: u64 = current_block.saturating_sub(fed_block);
             let hunger: u64 = time_passed * HUNGER_PER_BLOCK;
-            let current_fed:u64  = fed - hunger;
+            let current_fed:u64  = fed.saturating_sub(hunger);
             let new_fed:u64 = current_fed + FILL_PER_FEED;
            
             let new_fed_block: u64 = current_block;
@@ -123,9 +123,9 @@ async fn main() {
             let entertained: u64 = _tamagotchi.entertained;
            let entertained_block: u64 = _tamagotchi.entertained_block;
             let current_block: u64 = exec::block_height().into();
-            let time_passed: u64 = current_block - entertained_block;
+            let time_passed: u64 = current_block.saturating_sub(entertained_block);
             let boredom: u64 = time_passed * BOREDOM_PER_BLOCK;
-            let current_entertained: u64 = entertained - boredom;
+            let current_entertained: u64 = entertained.saturating_sub(boredom);
             let new_entertained: u64 = current_entertained + FILL_PER_ENTERTAINMENT;
 
             let new_entertained_block: u64 = current_block;
@@ -138,9 +138,9 @@ async fn main() {
             let slept: u64 = _tamagotchi.slept;
             let slept_block: u64 = _tamagotchi.slept_block;
             let current_block: u64 = exec::block_height().into();
-            let time_passed: u64 = current_block - slept_block;
+            let time_passed: u64 = current_block.saturating_sub(slept_block);
             let energy: u64 = time_passed * ENERGY_PER_BLOCK;
-            let current_slept: u64 = slept - energy;
+            let current_slept: u64 = slept.saturating_sub(energy);
             let new_slept: u64 = current_slept + FILL_PER_SLEEP;
 
             let new_slept_block: u64 = current_block;
