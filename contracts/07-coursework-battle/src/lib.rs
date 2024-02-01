@@ -1,283 +1,267 @@
+
 #![no_std]
+use gmeta::{In, InOut, Metadata, Out};
+use gstd::{collections::BTreeSet, exec, msg, panic, prelude::*, ActorId};
+use store_io::{AttributeId, StoreAction, StoreEvent};
+use coursework_battle_io::{TmgAction, TmgEvent};
 
-#[allow(unused_imports)]
-use gstd::{async_main, debug, exec, fmt, msg, prelude::*, ActorId, ReservationId};
-use sharded_fungible_token_io::{FTokenAction, FTokenEvent, LogicAction};
-use store_io::{StoreAction, StoreEvent};
-use coursework_battle_io::{Tamagotchi, TmgAction, TmgEvent};
+const MAX_POWER: u16 = 10_000;
+const MIN_POWER: u16 = 3_000;
 
-static mut TAMAGOTCHI: Option<Tamagotchi> = None;
+const MAX_ENERGY: u16 = 20_000;
+const MIN_ENERGY: u16 = 6_000;
 
-const HUNGER_PER_BLOCK: u32 = 1;
-const HUNGER_THRESHOLD: u32 = 2000;
-const FILL_PER_FEED: u32 = 1000;
+const SWORD_POWER: u16 = 2;
 
-const BOREDOM_PER_BLOCK: u32 = 2;
-const BOREDOM_THRESHOLD: u32 = 2000;
-const FILL_PER_ENTERTAINMENT: u32 = 1000;
+//CONST SHIELD_POWER: u16 = 2;
+//CONST SHIELD_ID: AttributeId = Default::default();
 
-const ENERGY_PER_BLOCK: u32 = 2;
-const ENERGY_THRESHOLD: u32 = 2000;
-const FILL_PER_SLEEP: u32 = 1000;
+const TIME_FOR_UPDATE: u32 = 500;
+const MAX_STEPS_FOR_ROUND: u8 = 3;
+const GAS_AMOUNT: u64 = 100_000_000;
 
-const TIME_INTERVAL: u32 = 60;
-const MAX_STAT_VALUE: u32 = 10000;
+pub type TamagotchiId = ActorId;
 
-#[no_mangle]
-extern fn init() {
-    let init_message: String = msg::load().expect("Can't decode tamagotchi's name");
-    let current_block = exec::block_height();
-    let tamagotchi = Tamagotchi {
-        name: init_message,
-        date_of_birth: exec::block_timestamp(),
-        owner: msg::source(),
-        fed: MAX_STAT_VALUE,
-        fed_block: current_block,
-        entertained: MAX_STAT_VALUE,
-        entertained_block: current_block,
-        slept: MAX_STAT_VALUE,
-        slept_block: current_block,
-        approved_account: None,
-        ft_contract_id: Default::default(),
-        transaction_id: Default::default(),
-        approve_transaction: None,
-        reservations: Vec::new(),
-    };
-    debug!(
-        "The Tamagotchi Program was initialized with name {:?} and birth date {:?}",
-        tamagotchi.name, tamagotchi.date_of_birth,
-    );
-
-    msg::send_delayed(exec::program_id(), TmgAction::CheckState, 0, TIME_INTERVAL)
-        .expect("Error in sending initial CheckState action message");
-
-    unsafe { TAMAGOTCHI = Some(tamagotchi) };
+#[derive(Default, Encode, Decode, TypeInfo, PartialEq, Eq, Debug)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub enum BattleState {
+    #[default]
+    Registration,
+    Moves,
+    Waiting,
+    GameIsOver,
 }
 
-#[async_main]
-async fn main() {
-    let tamagotchi = unsafe {
-        TAMAGOTCHI
-            .as_mut()
-            .expect("The contract is not initialized")
-    };
+#[derive(Default, Encode, Decode, TypeInfo)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub struct Battle {
+    pub players: Vec<Player>,
+    pub state: BattleState,
+    pub current_turn: u8,
+    pub tmg_store_id: ActorId,
+    pub winner: ActorId,
+    pub steps: u8,
+}
 
-    let tmg_action: TmgAction = msg::load().expect("Error loading TmgAction");
-    match tmg_action {
-        TmgAction::Name => reply_with(&tamagotchi.name),
-        TmgAction::Age => {
-            reply_with((exec::block_timestamp() - tamagotchi.date_of_birth).to_string())
+impl Battle {
+    pub async fn register(&mut self, tmg_id: &TamagotchiId) {
+        assert_eq!(
+            self.state,
+            BattleState::Registration,
+            "The game has already started"
+        );
+
+        let owner = get_owner(tmg_id).await;
+        let attributes = get_attributes(&self.tmg_store_id, tmg_id).await;
+
+        let power = generate_power();
+        let power = MAX_POWER - power;
+        let energy = generate_energy();
+        let player = Player {
+            owner,
+            tmg_id: *tmg_id,
+            energy,
+            power,
+            attributes,
+        };
+        self.players.push(player);
+        if self.players.len() == 2 {
+            self.current_turn = get_turn();
+            self.state = BattleState::Moves;
         }
-        TmgAction::Feed => {
-            fill_stat_and_reply(
-                &mut tamagotchi.fed,
-                &mut tamagotchi.fed_block,
-                HUNGER_PER_BLOCK,
-                FILL_PER_FEED,
-            );
-            debug!("Feed action {:?}", &tamagotchi.fed.to_string());
+        msg::reply(BattleEvent::Registered { tmg_id: *tmg_id }, 0)
+            .expect("Error during a reply `BattleEvent::Registered");
+    }
+
+    pub fn get_turn() -> u8 {
+        let random_input: [u8; 32] = array::from_fn(|i| i as u8 + 1);
+        let (random, _) = exec::random(random_input).expect("Error in getting random number");
+        random[0] % 2
+    }
+
+    pub fn make_move(&mut self) {
+        assert_eq!(
+            self.state,
+            BattleState::Moves,
+            "The game is not in `Moves` state"
+        );
+        let turn = self.current_turn as usize;
+
+        let next_turn = ((turn + 1) % 2) as usize;
+        let player = self.players[turn].clone();
+        assert_eq!(
+            player.owner,
+            msg::source(),
+            "You are not in the game or it is not your turn"
+        );
+        let mut opponent = self.players[next_turn].clone();
+        // let sword_power = if player.attributes.contains(&SWORD_ID) {
+        //     SWORD_POWER
+        // } else {
+        //     1
+        // };
+        let sword_power = SWORD_POWER;
+
+        opponent.energy = opponent.energy.saturating_sub(sword_power * player.power);
+
+        self.players[next_turn] = opponent.clone();
+        // Check if the opponent lost
+        if opponent.energy == 0 {
+            self.players = Vec::new();
+            self.state = BattleState::GameIsOver;
+            self.winner = player.tmg_id;
+            msg::reply(BattleEvent::GameIsOver, 0)
+                .expect("Error in sending a reply `BattleEvent::GameIsOver`");
+            return;
         }
-        TmgAction::Entertain => {
-            fill_stat_and_reply(
-                &mut tamagotchi.entertained,
-                &mut tamagotchi.entertained_block,
-                BOREDOM_PER_BLOCK,
-                FILL_PER_ENTERTAINMENT,
-            );
-            debug!("Entertain action {:?}", &tamagotchi.entertained.to_string());
+        if self.steps <= MAX_STEPS_FOR_ROUND {
+            self.steps += 1;
+            self.current_turn = next_turn as u8;
+            msg::reply(BattleEvent::MoveMade, 0)
+                .expect("Error in sending a reply `BattleEvent::MoveMade`");
+        } else {
+            self.state = BattleState::Waiting;
+            self.steps = 0;
+            msg::send_with_gas_delayed(
+                exec::program_id(),
+                BattleAction::UpdateInfo,
+                GAS_AMOUNT,
+                0,
+                TIME_FOR_UPDATE,
+            )
+            .expect("Error in sending a delayed message `BattleAction::UpdateInfo`");
+            msg::reply(BattleEvent::GoToWaitingState, 0)
+                .expect("Error in sending a reply `BattleEvent::MoveMade`");
         }
-        TmgAction::Sleep => {
-            fill_stat_and_reply(
-                &mut tamagotchi.slept,
-                &mut tamagotchi.slept_block,
-                ENERGY_PER_BLOCK,
-                FILL_PER_SLEEP,
-            );
-            debug!("Sleep action {:?}", &tamagotchi.slept.to_string());
+    }
+    pub async fn update_info(&mut self) {
+        assert_eq!(
+            msg::source(),
+            exec::program_id(),
+            "Only the contract itself can call that action"
+        );
+        assert_eq!(
+            self.state,
+            BattleState::Waiting,
+            "The contract must be in `Waiting` state"
+        );
+
+        for i in 0..2 {
+            let player = &mut self.players[i];
+            let attributes = get_attributes(&self.tmg_store_id, &player.tmg_id).await;
+            player.attributes = attributes;
         }
-        TmgAction::Transfer(new_owner) => {
-            if msg::source() == tamagotchi.owner
-                || Some(msg::source()) == tamagotchi.approved_account
-            {
-                tamagotchi.owner = new_owner;
-                msg::reply(TmgEvent::Transferred(new_owner), 0).expect("Error in sending reply");
-            } else {
-                panic!("You don't have permission to do this action")
-            }
-        }
-        TmgAction::Approve(account) => {
-            if msg::source() == tamagotchi.owner {
-                tamagotchi.approved_account = Some(account);
-                msg::reply(TmgEvent::Approved(account), 0).expect("Error in sending reply");
-            } else {
-                panic!("You don't have permission to do this action")
-            }
-        }
-        TmgAction::RevokeApproval => {
-            if msg::source() == tamagotchi.owner {
-                tamagotchi.approved_account = None;
-                msg::reply(TmgEvent::ApprovalRevoked, 0).expect("Error in sending reply");
-            } else {
-                panic!("You don't have permission to do this action")
-            }
-        }
-        TmgAction::SetFTokenContract(contract) => {
-            tamagotchi.ft_contract_id = Some(contract);
-            msg::reply(TmgEvent::FTokenContractSet, 0)
-                .expect("Error in a reply `TmgEvent::FTokenContractSet`");
-        }
-        TmgAction::ApproveTokens { account, amount } => {
-            approve_tokens(tamagotchi, &account, amount).await;
-            msg::reply(TmgEvent::TokensApproved { account, amount }, 0)
-                .expect("Error in a reply `TmgEvent::TokensApproved`");
-        }
-        TmgAction::BuyAttribute {
-            store_id,
-            attribute_id,
-        } => {
-            buy_attribute(&store_id, attribute_id).await;
-            msg::reply(TmgEvent::AttributeBought(attribute_id), 0)
-                .expect("Error in a reply `TmgEvent::AttributeBought`");
-        }
-        TmgAction::CheckState => {
-            update_stats(
-                tamagotchi,
-                tamagotchi.fed_block,
-                tamagotchi.entertained_block,
-                tamagotchi.slept_block,
-            );
-            if tamagotchi.fed <= HUNGER_THRESHOLD {
-                msg::send_from_reservation(
-                    *tamagotchi.reservations.last().unwrap(),
-                    tamagotchi.owner,
-                    TmgEvent::FeedMe,
-                    0,
-                )
-                .expect("Error when sending message to Tamagotchi owner asking to feed it");
-            }
-            if tamagotchi.entertained <= BOREDOM_THRESHOLD {
-                msg::send_from_reservation(
-                    *tamagotchi.reservations.last().unwrap(),
-                    tamagotchi.owner,
-                    TmgEvent::PlayWithMe,
-                    0,
-                )
-                .expect("Error when sending message to Tamagotchi owner asking to entertain it");
-            }
-            if tamagotchi.slept <= ENERGY_THRESHOLD {
-                msg::send_from_reservation(
-                    *tamagotchi.reservations.last().unwrap(),
-                    tamagotchi.owner,
-                    TmgEvent::WantToSleep,
-                    0,
-                )
-                .expect("Error when sending message to Tamagotchi owner asking to sleep it");
-            }
-            msg::send_delayed(exec::program_id(), TmgAction::CheckState, 0, TIME_INTERVAL)
-                .expect("Error in sending subsequent CheckState action message");
-        }
-        TmgAction::ReserveGas {
-            reservation_amount,
-            duration,
-        } => {
-            let reservation_id = ReservationId::reserve(reservation_amount, duration)
-                .expect("Error in reserving gas");
-            tamagotchi.reservations.push(reservation_id);
-            msg::reply(TmgEvent::GasReserved, 0)
-                .expect("Error in replying GasReserved event payload");
-        }
-        TmgAction::TmgInfo => {
-            msg::reply(TmgEvent::Owner(tamagotchi.owner), 0).expect("Error in sending reply");
-        }
-       
+        self.state = BattleState::Moves;
+        self.current_turn = get_turn();
+        msg::reply(BattleEvent::InfoUpdated, 0)
+            .expect("Error during a reply BattleEvent::InfoUpdated");
     }
 }
 
-#[no_mangle]
-extern fn state() {
-    let tamagotchi = unsafe {
-        TAMAGOTCHI
-            .as_mut()
-            .expect("The contract is not initialized")
-    };
-    update_stats(
-        tamagotchi,
-        tamagotchi.fed_block,
-        tamagotchi.entertained_block,
-        tamagotchi.slept_block,
-    );
-    debug!("Sending state: {:?}", tamagotchi);
-    msg::reply(tamagotchi, 0).expect("Failed to share state");
+#[derive(Default, Encode, Decode, TypeInfo, Clone)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub struct Player {
+    pub owner: ActorId,
+    pub tmg_id: TamagotchiId,
+    pub energy: u16,
+    pub power: u16,
+    pub attributes: BTreeSet<AttributeId>,
 }
 
-fn reply_with<T: fmt::Display>(value: T) {
-    msg::reply(&value.to_string(), 0).expect("Error in sending reply");
+#[derive(Encode, Decode, TypeInfo)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub enum BattleAction {
+    Register(TamagotchiId),
+    Move,
+    UpdateInfo,
+    // Attack(TamagotchiId, u8),
+    // Defend(TamagotchiId, u8),
+    // Surrender(TamagotchiId),
 }
 
-fn fill_stat_and_reply(
-    stat: &mut u32,
-    stat_block: &mut u32,
-    stat_wasted_per_block: u32,
-    fill_per_action: u32,
-) {
-    let actual_value = update_stat(*stat_block, stat_wasted_per_block);
-
-    *stat = fill_stat_value(actual_value, fill_per_action);
-    *stat_block = exec::block_height();
-
-    reply_with(*stat);
+#[derive(Encode, Decode, TypeInfo)]
+#[codec(crate = gstd::codec)]
+#[scale_info(crate = gstd::scale_info)]
+pub enum BattleEvent {
+    Registered { tmg_id: TamagotchiId },
+    Moved { tmg_id: TamagotchiId, steps: u8 },
+    GameOver { winner: ActorId },
+    GoToWaitingState,
+    InfoUpdated,
+    GameIsOver,
+    MoveMade,
 }
 
-fn update_stat(stat_block: u32, stat_wasted_per_block: u32) -> u32 {
-    let stat_lost = (exec::block_height() - stat_block) * stat_wasted_per_block;
+pub struct ProgramMetadata;
 
-    let stat = 10000u32.saturating_sub(stat_lost).saturating_add(1);
-
-    stat
+impl Metadata for ProgramMetadata {
+    type Init = In<ActorId>;
+    type Handle = InOut<BattleAction, BattleEvent>;
+    type Reply = ();
+    type Others = ();
+    type Signal = ();
+    type State = Out<Battle>;
 }
 
-fn fill_stat_value(stat: u32, fill_per_action: u32) -> u32 {
-    let filled_stat = stat + fill_per_action;
-    filled_stat.max(1).min(10000)
+pub async fn get_owner(tmg_id: &ActorId) -> ActorId {
+    let reply: TmgEvent = msg::send_for_reply_as(*tmg_id, TmgAction::TmgInfo, 0, 0)
+        .expect("Error in sending a message `TmgAction::Owner")
+        .await
+        .expect("Unable to decode TmgEvent");
+    if let TmgEvent::Owner(owner) = reply {
+        owner
+    } else {
+        panic!("Wrong received message");
+    }
 }
 
-fn update_stats(
-    tamagotchi: &mut Tamagotchi,
-    fed_block: u32,
-    entertained_block: u32,
-    slept_block: u32,
-) {
-    tamagotchi.fed = update_stat(fed_block, HUNGER_PER_BLOCK);
-    tamagotchi.entertained = update_stat(entertained_block, BOREDOM_PER_BLOCK);
-    tamagotchi.slept = update_stat(slept_block, ENERGY_PER_BLOCK);
+pub fn generate_power() -> u16 {
+    let random_input: [u8; 32] = array::from_fn(|i| i as u8 + 1);
+    let (random, _) = exec::random(random_input).expect("Error in getting random number");
+    let bytes: [u8; 2] = [random[0], random[1]];
+    let random_power: u16 = u16::from_be_bytes(bytes) % MAX_POWER;
+    if random_power < MIN_POWER {
+        return MAX_POWER / 2;
+    }
+    random_power
 }
 
-async fn approve_tokens(tamagotchi: &mut Tamagotchi, account: &ActorId, amount: u128) {
-    let _result_approve = msg::send_for_reply_as::<_, FTokenEvent>(
-        tamagotchi.ft_contract_id.unwrap(),
-        FTokenAction::Message {
-            transaction_id: tamagotchi.transaction_id,
-            payload: LogicAction::Approve {
-                approved_account: account.clone(),
-                amount,
-            },
+pub fn generate_energy() -> u16 {
+    let random_input: [u8; 32] = array::from_fn(|i| i as u8 + 1);
+    let (random, _) = exec::random(random_input).expect("Error in getting random number");
+    let bytes: [u8; 2] = [random[0], random[1]];
+    let random_energy: u16 = u16::from_be_bytes(bytes) % MAX_ENERGY;
+    if random_energy < MIN_ENERGY {
+        return MAX_ENERGY / 2;
+    }
+    random_energy
+}
+
+async fn get_attributes(tmg_store_id: &ActorId, tmg_id: &TamagotchiId) -> BTreeSet<AttributeId> {
+    let reply: StoreEvent = msg::send_for_reply_as(
+        *tmg_store_id,
+        StoreAction::GetAttributes {
+            tamagotchi_id: *tmg_id,
         },
         0,
         0,
     )
-    .expect("Error in sending a message `FTokenAction::Message`")
-    .await;
+    .expect("Error in sending a message `StoreAction::GetAttributes")
+    .await
+    .expect("Unable to decode `StoreEvent`");
+    if let StoreEvent::Attributes { attributes } = reply {
+        attributes
+    } else {
+        panic!("Wrong received message");
+    }
 }
 
-async fn buy_attribute(store: &ActorId, attribute: u32) {
-    let _result_buy = msg::send_for_reply_as::<_, StoreEvent>(
-        store.clone(),
-        StoreAction::BuyAttribute {
-            attribute_id: attribute,
-        },
-        0,
-        0,
-    )
-    .expect("Error in sending a message `StoreAction::BuyAttribute`")
-    .await;
+pub fn get_turn() -> u8 {
+    let random_input: [u8; 32] = array::from_fn(|i| i as u8 + 1);
+    let (random, _) = exec::random(random_input).expect("Error in getting random number");
+    random[0] % 2
 }
