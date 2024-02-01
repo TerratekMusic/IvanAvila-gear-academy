@@ -62,11 +62,10 @@ pub enum BattleAction {
 #[scale_info(crate = gstd::scale_info)]
 pub enum BattleEvent {
     Registered { tmg_id: TamagotchiId },
-    Moved { tmg_id: TamagotchiId, steps: u8 },
-    GameOver { winner: ActorId },
+    Moved,
+    GameOver ,
     GoToWaitingState,
     InfoUpdated
-    
 }
 
 pub struct ProgramMetadata;

@@ -10,7 +10,7 @@ const MAX_POWER: u16 = 10_000;
 const MIN_POWER: u16 = 3_000;
 
 const SWORD_POWER: u16 = 2;
-const SWORD_ID: AttributeId = Default::default();
+const SWORD_ID: AttributeId = 45;
 
 //CONST SHIELD_POWER: u16 = 2;
 //CONST SHIELD_ID: AttributeId = Default::default();
@@ -51,15 +51,16 @@ impl Battle {
 
         let owner = get_owner(tmg_id).await;
         let attributes = get_attributes(&self.tmg_store_id, tmg_id).await;
+        let energy = 100;
 
         let power = generate_power();
         let power = MAX_POWER - power;
         let player = Player {
-            owner,
+            owner:owner.clone(),
             tmg_id: *tmg_id,
-            energy,
-            power,
-            attributes,
+            energy: energy,
+            power: power,
+            attributes: attributes,
         };
         self.players.push(player);
         if self.players.len() == 2 {
@@ -96,11 +97,11 @@ impl Battle {
             "You are not in the game or it is not your turn"
         );
         let mut opponent = self.players[next_turn].clone();
-        // let sword_power = if player.attributes.contains(&SWORD_ID) {
-        //     SWORD_POWER
-        // } else {
-        //     1
-        // };
+        let sword_power = if player.attributes.contains(&SWORD_ID) {
+            SWORD_POWER
+        } else {
+            1
+        };
         let sword_power = SWORD_POWER;
 
         opponent.energy = opponent.energy.saturating_sub(sword_power * player.power);
@@ -160,10 +161,12 @@ impl Battle {
 }
 
 
-#[no_mangle]
-extern fn init() {
+#[gstd::async_init]
+async fn init() {
     let init_message: BattleAction = msg::load().expect("Can't decode regitration message");
-    let battle = Battle{
+    let TamagotchiId = msg::source();
+
+    let mut battle = Battle {
         players: Vec::new(),
         state: BattleState::Registration,
         current_turn: 0,
@@ -172,6 +175,8 @@ extern fn init() {
         steps: 0,
     };
 
+   battle.register(&TamagotchiId).await;
+    
   unsafe{
     BATTLE = Some(battle);
   }
